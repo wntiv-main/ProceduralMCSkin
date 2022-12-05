@@ -1,13 +1,14 @@
 // PLAYER DIMENSIONS (PX) - { X: 16, Y: 32, Z: 8 } // USE `skin.playersize`
 
-// Before using you must call `skin.init(<your canvas rendering context>)`
-// Use `skin.executeShader(<your shader program>)`
-// `skin.entity` is a "enum" with different 'limbs'
+// Create an instance with new Skin(<canvas rendering context>, <slimSkin?>)
+// Use `skin.executeShader(<your shader program function>)`
+// `Skin.entity` is a "enum" with different 'limbs'
 // Other functions are useful for finding a position on the atlas
 
 // IN
-// limb: The ID (skin.entity.NAME) of the limb this pixel is on (e.g. skin.entity.HEAD)
+// limb - The ID (skin.entity.NAME) of the limb this pixel is on (e.g. skin.entity.HEAD)
 // faceID - ID of the face the pixel is on. Format is (sign)(axis) eg "+z", "-y" (+x -x +y -y +z -z)
+// normalVector - faceID but as a normal vector
 // isOverlay - Whether the pixel is on the overlay layer or the initial layer
 // relativePos - Coordinate relative to the current face in atlas space
 // faceBoundingBox - Size of the current face
@@ -291,6 +292,29 @@ export class Skin {
 		}
 		return result;
 	};
+
+	linearGradient(worldPos, normalVector) {
+		normalVector = vec3(normalVector);
+		var val = 0,
+			max = 0;
+		for (var i of "xyz") {
+			max += Math.abs(normalVector[i]) * (this.playerSize[i] - 1);
+			val += (normalVector[i] < 0 ? (this.playerSize[i] - 1) - worldPos[i] : worldPos[i]) * Math.abs(normalVector[i]);
+		}
+		return val / max;
+	}
+
+	radialGradient(worldPos, normalVector) {
+		normalVector = vec3(Math.abs(normalVector[0]), Math.abs(normalVector[1]), Math.abs(normalVector[2]));
+		var sum = 0;
+		var wp = vec3.add(worldPos, vec3.add(vec3.scale(this.playerSize, -0.5), vec3(0.5, 0.5, 0.5)));
+		//ok nvm apparently not. return vec3.length(wp) / vec3.length(normalVector);
+		for (var i of "xyz") {
+			sum += Math.pow(Math.abs(wp[i]) / (normalVector[i] - 0.5), 2);
+		}
+		range("percent", Math.sqrt(sum) / vec3.length(vec3(1)));
+		return map_range(Math.sqrt(sum) / vec3.length(vec3(1)), vec3.length(vec3(0.5, 0.5, 1.5)) / vec3.length(normalVector), 1, 0, 1);
+	}
 	executeShader(fn) {
 		if (!this.canvas || !(this.canvas instanceof CanvasRenderingContext2D)) throw new Error("Library not initiated properly.");
 		var imageData = this.canvas.getImageData(0, 0, this.canvas.canvas.width, this.canvas.canvas.height);
@@ -314,6 +338,10 @@ export class Skin {
 							const in_ = {
 								limb: entity,
 								faceID: face,
+								normalVector: vec3(
+									face[1] == 'x' ? (face[0] == '-' ? -1 : 1) : 0,
+									face[1] == 'y' ? (face[0] == '-' ? -1 : 1) : 0,
+									face[1] == 'z' ? (face[0] == '-' ? -1 : 1) : 0),
 								isOverlay: !!overlay,
 								relativePos: vec2(x, y),
 								faceBoundingBox: this.faceSizes[entity][face_coord.y][face_coord.x],
@@ -381,6 +409,8 @@ Gradient.prototype.calculateColor = function (percent) {
 	return vec4(Gradient.__colorLib.interpolate(bottomColor, topColor, percent, Gradient.__colorLib.linear), bottomColor.a + percent * (topColor.a - bottomColor.a));
 }
 
+// A color stop within a gradient, color is a vec4 of the color (RGBA)
+// RG&B should range from 0-255, A should range from 0-1. percent is a value between 0 - 1
 Gradient.ColorStop = function (color, percent) {
 	if (globalThis == this) return;
 	this.color = vec4(color);
@@ -390,8 +420,8 @@ Gradient.ColorStop = function (color, percent) {
 
 Gradient.__colorLib = {
 	linear(valueA, valueB, threshold, isHue) {
-		valA = Math.min(valueA, valueB);
-		valB = Math.max(valueA, valueB);
+		var valA = Math.min(valueA, valueB);
+		var valB = Math.max(valueA, valueB);
 		if (valueA > valueB) threshold = 1 - threshold;
 		if (isHue) {
 			var len1, len2;
@@ -499,39 +529,17 @@ Gradient.__colorLib = {
 }
 //#endregion Gradient Library
 
-export function percent(num, max) {
+function percent(num, max) {
 	return num / (max - 1);
 }
 
 //var
 
-export function linearGradient(worldpos, normalVector) {
-	normalVector = vec3(normalVector);
-	var val = 0,
-		max = 0;
-	for (var i of "xyz") {
-		max += Math.abs(normalVector[i]) * (skin.playersize[i] - 1);
-		val += (normalVector[i] < 0 ? (skin.playersize[i] - 1) - worldpos[i] : worldpos[i]) * Math.abs(normalVector[i]);
-	}
-	return val / max;
-}
-
-export function radialGradient(worldpos, normalVector) {
-	normalVector = vec3(Math.abs(normalVector[0]), Math.abs(normalVector[1]), Math.abs(normalVector[2]));
-	var sum = 0;
-	var wp = vec3.add(worldpos, vec3.add(vec3.scale(skin.playersize, -0.5), vec3(0.5, 0.5, 0.5)));
-	//ok nvm apparently not. return vec3.length(wp) / vec3.length(normalVector);
-	for (var i of "xyz") {
-		sum += Math.pow(Math.abs(wp[i]) / (normalVector[i] - 0.5), 2);
-	}
-	range("percent", Math.sqrt(sum) / vec3.length(vec3(1)));
-	return map_range(Math.sqrt(sum) / vec3.length(vec3(1)), vec3.length(vec3(0.5, 0.5, 1.5)) / vec3.length(normalVector), 1, 0, 1);
-}
-
 export function map_range(value, low1, high1, low2, high2) {
 	return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
 }
 
+// Debugging purposes. get the max and min values returned by a function
 export function range(varName, val) {
 	if (!(varName in range.data)) range.data[varName] = [];
 	range.data[varName].push(val);
