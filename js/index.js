@@ -1,16 +1,19 @@
+// DO NOT EDIT THIS UNLESS YOU KNOW WHAT YOU ARE DOING, line 55 is for you
 import {
 	SkinViewer,
 	IdleAnimation
 } from "skinview3d"
 import {
 	Skin,
-	Gradient
+	Gradient,
+	copyToClipboard
 } from "./skin.js"
 import {
 	noise
 } from "./perlin.js"
 import * as THREE from "three"
 
+//#region NOEDIT
 let skinViewer = new SkinViewer({
 	canvas: document.getElementById("skinViewer"),
 	width: 800,
@@ -45,71 +48,87 @@ skin.onComplete = () => {
 	c.renderTarget.src = canvas.toDataURL();
 	skinViewer.loadSkin(canvas.toDataURL());
 }
+//#endregion NOEDIT
+// EDIT PAST HERE
 
 function opal(i, o) {
-	var scaler = Math.sqrt;
+	// Scale noise with this function
+	var scaler = Math.sqrt; // Math.sqrt will increase the chance of higher tones
 	if (!i.isOverlay) {
+		// Scaled world pos, for less noisy noise
 		var swp = vec3.scale(i.worldPos, 0.08);
-		var nval1 = scaler(noise(swp.x, swp.y, swp.z));
-		var nval2 = scaler(noise(swp.x + 100, swp.y, swp.z));
-		var nval3 = scaler(noise(swp.x, swp.y + 100, swp.z));
-		o.color = vec4(nval1, nval2, nval3, 1);
+		// Get the r, g, and b noise values
+		var rNoise = scaler(noise(swp.x, swp.y, swp.z));
+		var gNoise = scaler(noise(swp.x + 100, swp.y, swp.z));
+		var bNoise = scaler(noise(swp.x, swp.y + 100, swp.z));
+		// output color
+		o.color = vec4(rNoise, gNoise, bNoise, 1);
+		// Overlay color is white with transparency based on a fourth noise layer
+		// and inverse scaled by the distance to the centre of the face to make the
+		// edges of the faces likely to have more transparency.
 		var distToCenter = vec2.subtract(i.relativePos, vec2.scale(i.faceBoundingBox, 0.5)).length() / (i.faceBoundingBox.length() / 2);
 		o.overlayColor = vec4(vec3(1), noise(swp.x, swp.y, swp.z + 100) * (1 - distToCenter / 2));
 	}
 }
 
-var forestHue = new Gradient();
-
-forestHue.addColorStop(new Gradient.ColorStop(vec4(31, 255, 26, 1), 0));
-forestHue.addColorStop(new Gradient.ColorStop(vec4(255, 219, 47, 1), 1));
-
-var coolSunset = new Gradient();
-
-coolSunset.addColorStop(new Gradient.ColorStop(vec4(255, 31, 10, 1), 0));
-coolSunset.addColorStop(new Gradient.ColorStop(vec4(0, 31, 234, 1), 1));
-
+// Create a gradient with a color stop at each end
 var fire = new Gradient();
 fire.addColorStop(new Gradient.ColorStop(vec4(248, 148, 0, 1), 0));
 fire.addColorStop(new Gradient.ColorStop(vec4(149, 15, 0, 1), 1));
+// Gradients can be used with gradient.calculateColor(percentage)
+// gradient.calculateColor expects a decimal value from 0 - 1 and will return the
+// blended color at that coordinate along the gradient.
 
-// noiseSeed("Opal");
+// This library works by executing multiple "shaders" on a HTML5 canvas
+// You can have multiple passes, and each pass has access to the output of the previous pass
+// This allows for post-process effects such as blur, color manipulation (contrast, hue shift, etc)
 
-skin.executeShader(opal);
+// skin.executeShader(opal);
 
-// skin.executeShader((i, o) => {
-// 	if (!i.isOverlay) {
-// 		// o.color = vec4(vec2.divide(i.relativePos, i.faceBoundingBox), 0, 1);
-// 		var distToCenter = vec2.subtract(vec2.add(i.relativePos, vec2(0.5)), vec2.scale(i.faceBoundingBox, 0.5)).length() / (i.faceBoundingBox.length() / 2);
-// 		o.color = vec4(vec3(distToCenter), 1);
-// 		// o.overlayColor = vec4(vec3(1), noise(swp.x, swp.y, swp.z + 100) * Math.min(1, 1.5 - distToCenter));
-// 		// range("noise", nval);
-// 		// Gradient.rainbow.calculateColor(radialGradient(i.worldPos, vec3.scale(vec3(8, 16, 8), 0.6917503296121503)));
-// 		// var grad1 = coolSunset.calculateColor(linearGradient(i.worldPos, vec3(0.2, -1, 0.2)));
-// 		// var grad2 = forestHue.calculateColor(linearGradient(i.worldPos, vec3(0.2, -1, 0.2)));
-// 		// o.color = grad1;
-// 		// o.overlayColor = grad2;
-// 		// if (Math.random() > 0.7) {
-// 		// 	o.color = grad2;
-// 		// 	o.overlayColor = vec4(0);
-// 		// }
-// 	}
-// });
+skin.executeShader((i, o) => {
+	// This function gets called once for every pixel of the skin
+	// a shader program has access to a bunch of input and output objects, stored in i and o
+	if (!i.isOverlay) { // i.isOverlay is whether we are on the base layer or overlay layer
+		// Generally when you are using o.overlayColor you will want to avoid writing
+		// onto the overlay layer otherwise, hence if(!i.isOverlay)
 
-// skin.executeShader((i, o) => {
-// 	if (!i.isOverlay) {
-// 		var oldColor = i.readFromAtlas(i.atlasPos);
-// 		var extremes = range.extremes("noise");
-// 		var nval = map_range(oldColor.x, extremes.min, extremes.max, 0, 1);
-// 		o.color = fire.calculateColor(nval);
-// 		if (nval > 0.5) {
-// 			o.overlayColor = o.color;
-// 			o.color = fire.calculateColor(1 - nval);
-// 		}
-// 	}
-// })
+		// In the input (i) you have the following values:
+		// limb: the currently rendering limb, one of Skin.entity.HEAD, Skin.entity.BODY, etc
+		// faceID: the current face identifier as a string in the format "(sign)(axis)", i.e. one of -x +x -y +y -z +z
+		// normalVector: the normal vector of the current face
+		// isOverlay: are we currently on the overlay layer,
+		// relativePos: the current position relative to this face as a vec2,
+		// faceBoundingBox: the size of the current face as a vec2,
+		// atlasPos: the position on the texture atlas (i.e. the position on the output skin file)),
+		// worldPos: the position of the pixel in world space, useful if you want to use something
+		//			 like noise and you want the texture to connect across edges
+		// readFromAtlas(pos): a function to read any pixel color from the texture atlas. This only reads colors
+		//					   from the previous pass
 
-var blur = (i, o) => {
+		// In the output (o) you have the following values:
+		// color: the color that this pixel should be, initialised with the color
+		//		  from the previous pass or vec4(0)
+		// overlayColor: the color that the overlay should be at this pixel
+		//				 not available on the overlay layer, initialised with
+		//				 the color at this pixel on the overlay from the previous pass or vec4(0)
+		// writeToAtlas(color, pos): write a given color to any pixel on the texture atlas
+		//							 this function is untested and may break things
+
+		// Get the rainbow gradient, and with an offset
+		var grad1 = Gradient.rainbow.calculateColor((0.5 + skin.linearGradient(i.worldPos, vec3(0, -1, 0))) % 1);
+		var grad2 = Gradient.rainbow.calculateColor(skin.linearGradient(i.worldPos, vec3(0, -1, 0)));
+		o.color = grad1;
+		o.overlayColor = grad2;
+		if (Math.random() < 0.5) {
+			o.color = grad2;
+			o.overlayColor = vec4(0);
+		}
+	}
+});
+
+
+// shader function to blur faces
+function blur(i, o) {
 	var colors = [],
 		thisColor = i.readFromAtlas(i.atlasPos);
 	colors.push(thisColor);
