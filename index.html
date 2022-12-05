@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Skin Editor</title>
+	<link rel="stylesheet" href="css/style.css">
+	<script type="importmap">
+		{
+			"imports": {
+				"three": "https://unpkg.com/three@0.143.0/build/three.module.js",
+				"three/": "https://unpkg.com/three@0.143.0/",
+				"skinview-utils": "./skinview-utils/build/index.js",
+				"skinview3d": "./skinview3d/libs/skinview3d.js"
+			}
+		}
+	</script>
+</head>
+
+<body>
+	<progress id="progressBar" max="1000"></progress>
+	<br />
+	<canvas id="canvas" width=64 height=64></canvas>
+	<img id="fakeCanvas" alt="" width=64 height=64 />
+	<canvas id="skinViewer"></canvas>
+	<br />
+	<button id="getURL">Get image URL</button>
+	<script src="js/vec.js"></script>
+	<script type="module" src="js/index.js"></script>
+</body>
+
+</html>

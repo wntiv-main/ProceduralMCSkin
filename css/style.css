@@ -1,0 +1,13 @@
+#fakeCanvas {
+	padding: 31.5px;
+	background: conic-gradient(#eee 0.25turn, #aaa 0.25turn 0.5turn, #eee 0.5turn 0.75turn, #aaa 0.75turn) top left / 16px 16px repeat;
+	image-rendering: pixelated;
+	width: 256px;
+	height: 256px;
+}
+
+#canvas {
+	display: none;
+	/* width: 512px; */
+	/* image-rendering: pixelated; */
+}
